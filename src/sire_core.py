@@ -367,7 +367,7 @@ class ExcelGenerator:
             adjusted_width = min(max_length + 2, 50)
             ws.column_dimensions[column_letter].width = adjusted_width
     
-    def create_excel(self, df, output_path):
+    def create_excel(self, df, output_path, progress_callback=None):
         """Crear Excel con múltiples hojas si es necesario"""
         try:
             df_chunks = self.split_dataframe(df)
@@ -391,16 +391,22 @@ class ExcelGenerator:
                 self.format_header(ws)
                 self.auto_fit_columns(ws)
                 conv_logger.info(f"Hoja {idx} completada")
+                if progress_callback:
+                    progress_callback(min(0.90, (idx / max(len(df_chunks), 1)) * 0.85), f"Generando hoja {idx} de {len(df_chunks)}")
             
             # Construcción de hoja resumen
             summary_ws = wb.create_sheet("Resumen", 0)
             self._create_summary(summary_ws, df_chunks, df)
+            if progress_callback:
+                progress_callback(0.95, "Escribiendo archivo Excel final...")
             
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             wb.save(output_path)
             
             msg = f"Excel creado: {self.sheets_created} hoja(s)"
             conv_logger.info(msg)
+            if progress_callback:
+                progress_callback(1.0, "Excel generado correctamente")
             return True, msg
             
         except Exception as e:

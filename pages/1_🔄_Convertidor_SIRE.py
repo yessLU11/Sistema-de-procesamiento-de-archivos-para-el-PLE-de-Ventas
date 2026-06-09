@@ -9,6 +9,7 @@ import os
 import logging
 import gc
 import sys 
+import time
 from datetime import datetime
 from pathlib import Path
 import traceback
@@ -123,10 +124,23 @@ if st.session_state.formato_seleccionado:
         st.markdown("### ⚙️ **Paso 3: Procesar y Convertir**")
         
         if st.button("🚀 CONVERTIR A EXCEL", use_container_width=True):
+            start_time = time.perf_counter()
+            progress_bar = st.progress(0.0)
+            status_text = st.empty()
+
+            def update_progress(value, message=''):
+                try:
+                    progress_bar.progress(value)
+                except Exception:
+                    pass
+                if message:
+                    status_text.info(message)
+
             with st.spinner('⏳ Procesando datos, por favor espere...\n\n⚠️ Archivos grandes pueden tomar varios minutos.'):
                 try:
                     # 🕒 GENERAMOS EL TIMESTAMP AQUÍ PARA QUE NO DE ERROR
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    update_progress(0.05, 'Guardando archivo temporal...')
                     
                     # Guardar temporalmente
                     temp_path = os.path.join("input_files", "temp_upload.txt")
@@ -142,12 +156,13 @@ if st.session_state.formato_seleccionado:
                     else:
                         processor = TXTProcessorSinEncabezado(max_size_mb=2000)
                     
+                    update_progress(0.20, 'Leyendo el archivo TXT...')
                     df, error = processor.read_txt(temp_path)
                     
                     if error:
                         st.error(f"❌ Error al leer: {error}")
                     else:
-                        # Validar
+                        update_progress(0.45, 'Validando datos...')
                         validator = SIREValidator()
                         validation = validator.validate_all(df)
                         
@@ -168,7 +183,14 @@ if st.session_state.formato_seleccionado:
 
                             output_filename = f"output_files/{nombre_original}.xlsx"
                             generator = ExcelGenerator()
-                            success, message = generator.create_excel(df, output_filename)
+                            success, message = generator.create_excel(
+                                df,
+                                output_filename,
+                                progress_callback=update_progress
+                            )
+                            
+                            elapsed = time.perf_counter() - start_time
+                            update_progress(1.0, f'Conversión completada en {elapsed:.2f} segundos')
                             
                             if success:
                                 # Limpiar temporal
@@ -187,6 +209,7 @@ if st.session_state.formato_seleccionado:
                                 with col3:
                                     st.metric("📄 Hojas Excel", generator.sheets_created)
                                 with col4:
+                                    st.metric("⏱️ Tiempo total", f"{elapsed:.2f} s")
                                     monto_col = None
                                     for col in ['MontoTotal', 'Total CP', 'Total']:
                                         if col in df.columns:

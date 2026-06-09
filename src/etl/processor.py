@@ -1,6 +1,7 @@
 # processor.py
 import pandas as pd
 import io
+import time
 
 # --- REGLAS DE NEGOCIO ---
 PREFIX_RULES = {
@@ -28,11 +29,13 @@ def normalizar_codigo(tipo_doc, codigo_original):
     
     return prefijo_necesario + codigo_str
 
-def procesar_excel(file_stream):
+def procesar_excel(file_stream, progress_callback=None):
     """Orquestador principal: Extrae, Normaliza y Detecta Duplicados."""
+    start_time = time.perf_counter()
     try:
         excel_file = pd.ExcelFile(file_stream)
         hojas = excel_file.sheet_names
+        total_hojas = len(hojas)
         
         df_limpio = pd.DataFrame()
         lista_errores = []
@@ -40,7 +43,7 @@ def procesar_excel(file_stream):
         total_filas = 0
         duplicados_encontrados = 0
 
-        for hoja in hojas:
+        for idx, hoja in enumerate(hojas):
             df = pd.read_excel(excel_file, sheet_name=hoja)
             
             if df.empty:
@@ -68,6 +71,9 @@ def procesar_excel(file_stream):
             df['Hoja_Nombre'] = hoja
             df_limpio = pd.concat([df_limpio, df], ignore_index=True)
 
+            if progress_callback:
+                progress_callback((idx + 1) / max(total_hojas, 1), f"procesando hoja {idx + 1} de {total_hojas}: {hoja}")
+
         # Detección de duplicados para documentos 01 y 03
         df_solo_validos = df_limpio[df_limpio['TipoDoc_Norm'].isin(['01', '03'])].copy()
 
@@ -88,6 +94,9 @@ def procesar_excel(file_stream):
             lista_errores.append("Falta columna 'NumeroCorrelativo' para generar claves.")
 
         total_filas = len(df_limpio)
+        elapsed = time.perf_counter() - start_time
+        if progress_callback:
+            progress_callback(1.0, f"finalizado en {elapsed:.2f} segundos")
 
         return {
             "success": True,
@@ -96,7 +105,8 @@ def procesar_excel(file_stream):
             "duplicados_count": duplicados_encontrados,
             "df_duplicados": df_trazabilidad,
             "df_limpio": df_limpio, 
-            "errores": lista_errores
+            "errores": lista_errores,
+            "elapsed_seconds": elapsed
         }
 
     except Exception as e:
@@ -109,10 +119,11 @@ def procesar_excel(file_stream):
 # ============================================================================
 # NUEVO MÓDULO: ORDENAR BOLETAS POR DÍA
 # ============================================================================
-def ordenar_boletas(file_stream):
+def ordenar_boletas(file_stream, progress_callback=None):
     """
     Procesa un archivo Excel de boletas (PLE Ventas) y genera un resumen con columnas fijas.
     """
+    start_time = time.perf_counter()
     try:
         # =========================================================================
         # 1. DEFINICIÓN DE LAS COLUMNAS FIJAS (en el orden exacto del requerimiento)
@@ -136,6 +147,9 @@ def ordenar_boletas(file_stream):
         if not all_sheets:
             return {'success': False, 'error': 'El archivo Excel no contiene hojas.'}
         
+        if progress_callback:
+            progress_callback(0.05, 'Leyendo hojas del archivo Excel...')
+
         df = pd.concat(all_sheets.values(), ignore_index=True)
         
         # =========================================================================
@@ -179,12 +193,13 @@ def ordenar_boletas(file_stream):
         # =========================================================================
         df_sorted = df.sort_values(['FechaEmision', 'CodigoEstablecimiento', 'NumeroCorrelativo'])
         grupos = df_sorted.groupby(['FechaEmision', 'CodigoEstablecimiento'])
+        total_grupos = grupos.ngroups if hasattr(grupos, 'ngroups') else 1
         
         output_rows = []
         id_counter = 1
         serie_counter = 1
         
-        for (fecha, establecimiento), grupo in grupos:
+        for idx, ((fecha, establecimiento), grupo) in enumerate(grupos):
             primera = grupo.iloc[0]
             ultimo_correlativo = int(grupo['NumeroCorrelativo'].max())
             suma_total = grupo['MontoOtrosConceptos'].sum()
@@ -199,7 +214,7 @@ def ordenar_boletas(file_stream):
             id_counter += 1
             
             # Generar Serie
-            nueva_serie = f"M{serie_counter:07d}"
+            nueva_serie = f"M123{serie_counter:03d}"
             serie_counter += 1
             
             # Construir diccionario respetando el orden fijo de columnas
@@ -232,6 +247,8 @@ def ordenar_boletas(file_stream):
                     else:
                         row_dict[col] = ''
             output_rows.append(row_dict)
+            if progress_callback:
+                progress_callback(0.20 + 0.70 * ((idx + 1) / max(total_grupos, 1)), f"Agrupando y generando registro {idx + 1} de {total_grupos}")
         
         # =========================================================================
         # 8. CREAR DATAFRAME DE SALIDA Y REESCRIBIR LA COLUMNA 'TIPO'
@@ -279,13 +296,17 @@ def ordenar_boletas(file_stream):
                     worksheet.column_dimensions[col_letter].width = adjusted_width
         
         output_buffer.seek(0)
+        elapsed = time.perf_counter() - start_time
+        if progress_callback:
+            progress_callback(1.0, f"finalizado en {elapsed:.2f} segundos")
         
         return {
             'success': True,
             'message': 'Procesamiento exitoso ✨',
             'buffer': output_buffer,
             'sheets': list(df_out['CodigoEstablecimiento'].unique()),
-            'total_rows': len(df_out)
+            'total_rows': len(df_out),
+            'elapsed_seconds': elapsed
         }
         
     except Exception as e:

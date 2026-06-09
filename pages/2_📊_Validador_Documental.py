@@ -9,6 +9,7 @@ import os
 import logging
 import datetime
 import pathlib
+import time
 from config import APP_TITLE, APP_ICON, INPUT_DIR, OUTPUT_DIR, LOG_DIR
 import gc
 import io
@@ -31,18 +32,34 @@ if archivo_subido:
     # Botón de ejecución
     if st.button("🚀 Ejecutar Validación"):
         
+        start_time = time.perf_counter()
+        progress_bar = st.progress(0.0)
+        status_text = st.empty()
+
+        def progress_callback(value, message=''):
+            try:
+                progress_bar.progress(value)
+            except Exception:
+                pass
+            if message:
+                status_text.info(message)
+
         with st.spinner('Procesando documento...'):
             # Llamamos al módulo ETL alojado en src
-            resultado = procesar_excel(archivo_subido)
+            resultado = procesar_excel(archivo_subido, progress_callback=progress_callback)
+
+        elapsed = time.perf_counter() - start_time
+        progress_callback(1.0, f'Finalizado en {elapsed:.2f} segundos')
 
         if resultado['success']:
             # --- DASHBOARD DE MÉTRICAS ---
             st.subheader("📋 Resumen del Procesamiento")
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("Total Filas Leídas", resultado['total_registros'])
             col2.metric("Hojas Procesadas", len(resultado['hojas_procesadas']))
             col3.metric("Duplicados Detectados", resultado['duplicados_count'], delta_color="inverse")
+            col4.metric("Tiempo total", f"{elapsed:.2f} s")
 
             # Mostrar errores o advertencias si existen
             if resultado['errores']:
