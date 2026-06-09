@@ -205,16 +205,16 @@ def ordenar_boletas(file_stream, progress_callback=None):
             suma_total = grupo['MontoOtrosConceptos'].sum()
             
             # Generar IDComprobante
+            # el id debe ser tal cual esta en el excel original, solo debe tomar los 7 numeros que por ejemplo el id en el excel ingresado es 123-2981234 entonces el id en el excel a generar es 123-2981
             id_original = str(primera['IDComprobante'])
             if '-' in id_original:
-                prefijo = id_original.split('-')[0]
+                id_parts = id_original.split('-')
+                nuevo_id = f"{id_parts[0]}-{id_parts[1][:4]}"# si tengo 123-7354829 entonces el nuevo id es 123-7354
             else:
-                prefijo = id_original[:3]
-            nuevo_id = f"{prefijo}-{id_counter:04d}"
-            id_counter += 1
-            
+                nuevo_id = id_original[:7]  # Si no tiene guion, tomar los primeros 7 caracteres
+
             # Generar Serie
-            nueva_serie = f"M123{serie_counter:03d}"
+            nueva_serie = f"M123{serie_counter:04d}"#ejemplo de lo que hace serie_counter: M1230001, M1230002, etc.
             serie_counter += 1
             
             # Construir diccionario respetando el orden fijo de columnas
@@ -228,10 +228,10 @@ def ordenar_boletas(file_stream, progress_callback=None):
                     row_dict[col] = nuevo_id
                 elif col == 'Serie':
                     row_dict[col] = nueva_serie
-                elif col == 'NumeroCorrelativo':
-                    row_dict[col] = ultimo_correlativo
+                elif col == 'NumeroCorrelativo': # aqui debe ir el 1er correlativo del grupo, no el ultimo ejempplo para la fecha 03/05/2026 su numerocorrelativo es 41834397 y en la columna campo_10 debe ir el último número correlativo del grupo	41835032
+                    row_dict[col] = grupo['NumeroCorrelativo'].min()
                 elif col == 'campo_10':
-                    row_dict[col] = ultimo_correlativo
+                    row_dict[col] = ultimo_correlativo #indica el último número correlativo del grupo
                 elif col == 'MontoOtrosConceptos':
                     row_dict[col] = suma_total
                 elif col == 'campo_25':
@@ -240,6 +240,10 @@ def ordenar_boletas(file_stream, progress_callback=None):
                     row_dict[col] = 1
                 elif col in ['campo_23', 'campo_24']:
                     row_dict[col] = ''   # K, L, M vacías
+                elif col == 'NumeroDocCliente':# esta columna siempre debe estar vacía
+                    row_dict[col] = ''
+                elif col == 'RazonSocialCliente':# esta columna siempre debe estar vacía
+                    row_dict[col] = ''
                 else:
                     # Para el resto de columnas, tomar el valor de la primera fila del grupo (si existe)
                     if col in primera:
