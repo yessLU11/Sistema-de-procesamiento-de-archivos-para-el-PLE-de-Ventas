@@ -264,7 +264,7 @@ chmod 755 input_files output_files logs
 **Desarrollado por:** Área de Tributación - Banco de la Nación del Perú
 
 Para reportar bugs o sugerencias:
-- 📧 Email: tributacion@bn.com.pe
+- 📧 Email: yessly.poma@unmsm.edu.pe
 - 📋 Issues: [GitHub Issues](https://github.com/yessLU11/Sistema-de-procesamiento-de-archivos-para-el-PLE-de-Ventas/issues)
 
 ---
