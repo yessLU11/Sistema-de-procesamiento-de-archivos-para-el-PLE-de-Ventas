@@ -205,7 +205,7 @@ def ordenar_boletas(file_stream, progress_callback=None):
         
         if progress_callback:
             progress_callback(0.12, f'✅ Hojas procesadas: {hojas_procesadas} | Hojas omitidas: {hojas_saltadas}')
-            
+
         # =========================================================================
         # 3. LIMPIEZA DE FILAS BASURA (RESUMEN DE CONVERSIÓN, UNNAMED, ETC.)
         # =========================================================================
@@ -312,7 +312,7 @@ def ordenar_boletas(file_stream, progress_callback=None):
                 nuevo_id = id_original[:7]  # Si no tiene guion, tomar los primeros 7 caracteres
 
             # Generar Serie
-            nueva_serie = f"M123{serie_counter:04d}"#ejemplo de lo que hace serie_counter: M1230001, M1230002, etc.
+            nueva_serie = f"M123"  # {serie_counter:04d}"#ejemplo de lo que hace serie_counter: M1230001, M1230002, etc.
             serie_counter += 1
             
             # Construir diccionario respetando el orden fijo de columnas
@@ -321,7 +321,7 @@ def ordenar_boletas(file_stream, progress_callback=None):
                 if col == 'Tipo':
                     # Esta columna se reescribirá después con el número correlativo global
                     # Por ahora la dejamos como placeholder
-                    row_dict[col] = None
+                    row_dict[col] = " "
                 elif col == 'IDComprobante':
                     row_dict[col] = nuevo_id
                 elif col == 'Serie':
@@ -360,9 +360,9 @@ def ordenar_boletas(file_stream, progress_callback=None):
         if progress_callback:
             progress_callback(0.95, 'Creando DataFrame de salida...')
         
-        df_out = pd.DataFrame(output_rows, columns=COLUMNAS_FIJAS)
+        #df_out = pd.DataFrame(output_rows, columns=COLUMNAS_FIJAS)
         # Reemplazar la columna 'Tipo' con valores correlativos 1, 2, 3, ...
-        df_out['Tipo'] = range(1, len(df_out) + 1)
+        #df_out['Tipo'] = range(1, len(df_out) + 1)
         
         # =========================================================================
         # 9. ESCRIBIR EXCEL CON UNA HOJA POR CADA CÓDIGO DE ESTABLECIMIENTO
